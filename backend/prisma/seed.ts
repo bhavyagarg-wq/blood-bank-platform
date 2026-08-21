@@ -208,6 +208,8 @@ async function main(): Promise<void> {
     [southBank.id, BloodType.B, RhFactor.negative, 2, 9],
     [farBank.id, BloodType.O, RhFactor.negative, 6, 40],
     [farBank.id, BloodType.AB, RhFactor.negative, 3, 28],
+    // Already past expiry, so the admin expiry sweep has something to move.
+    [centralBank.id, BloodType.B, RhFactor.negative, 1, -1],
   ];
 
   for (const [bloodBankId, bloodType, rhFactor, count, expiresInDays] of stock) {

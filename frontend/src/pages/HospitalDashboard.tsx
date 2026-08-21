@@ -1,6 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import { Card, ErrorBanner, Field, LiveFeed, StatusBadge, bloodGroup, formatDateTime } from '../components';
+import {
+  Card,
+  ErrorBanner,
+  Field,
+  LiveFeed,
+  StatusBadge,
+  bloodGroup,
+  formatDateTime,
+  shortId,
+} from '../components';
 import { useRealtime } from '../useRealtime';
 import type { BloodType, EmergencyRequest, Match, Paginated, RhFactor } from '../types';
 
@@ -19,6 +28,7 @@ export function HospitalDashboard() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyMatchId, setBusyMatchId] = useState<string | null>(null);
 
   const [doctorName, setDoctorName] = useState('Dr. Meera Iyer');
   const [department, setDepartment] = useState('Trauma');
@@ -84,11 +94,14 @@ export function HospitalDashboard() {
 
   async function act(matchId: string, action: 'accept' | 'reject') {
     setError(null);
+    setBusyMatchId(matchId);
     try {
       await api.post(`/matches/${matchId}/${action}`);
       await refresh();
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Action failed');
+    } finally {
+      setBusyMatchId(null);
     }
   }
 
@@ -237,6 +250,7 @@ export function HospitalDashboard() {
           <thead>
             <tr>
               <th>Score</th>
+              <th>Unit</th>
               <th>Blood bank</th>
               <th>Group</th>
               <th>Compat.</th>
@@ -253,6 +267,7 @@ export function HospitalDashboard() {
                 <td>
                   <strong>{match.score.toFixed(1)}</strong>
                 </td>
+                <td className="muted">{shortId(match.bloodUnitId)}</td>
                 <td>{match.bloodBank?.name ?? match.bloodBankId}</td>
                 <td>
                   {match.bloodUnit ? bloodGroup(match.bloodUnit.bloodType, match.bloodUnit.rhFactor) : '—'}
@@ -267,10 +282,19 @@ export function HospitalDashboard() {
                 <td>
                   {match.status === 'proposed' && (
                     <span className="row">
-                      <button className="primary" type="button" onClick={() => act(match.id, 'accept')}>
+                      <button
+                        className="primary"
+                        type="button"
+                        disabled={busyMatchId === match.id}
+                        onClick={() => act(match.id, 'accept')}
+                      >
                         Accept
                       </button>
-                      <button type="button" onClick={() => act(match.id, 'reject')}>
+                      <button
+                        type="button"
+                        disabled={busyMatchId === match.id}
+                        onClick={() => act(match.id, 'reject')}
+                      >
                         Reject
                       </button>
                     </span>
@@ -280,7 +304,7 @@ export function HospitalDashboard() {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={9} className="muted">
+                <td colSpan={10} className="muted">
                   No proposals for this request.
                 </td>
               </tr>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { RealtimeEvent } from './useRealtime';
 
 export function Card({ title, children, actions }: { title?: string; children: ReactNode; actions?: ReactNode }) {
@@ -55,6 +55,11 @@ export function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${STATUS_TONE[status] ?? ''}`}>{status.replace(/_/g, ' ')}</span>;
 }
 
+/** Last 6 characters of a UUID — enough to tell otherwise identical rows apart. */
+export function shortId(id: string): string {
+  return id.slice(-6);
+}
+
 export function bloodGroup(bloodType: string, rhFactor: string): string {
   return `${bloodType}${rhFactor === 'positive' ? '+' : '-'}`;
 }
@@ -64,9 +69,20 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/** Scrolls itself into view so a rejected submit below the fold is never silent. */
 export function ErrorBanner({ error }: { error: string | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [error]);
+
   if (!error) return null;
-  return <div className="error">{error}</div>;
+  return (
+    <div className="error" ref={ref} role="alert">
+      {error}
+    </div>
+  );
 }
 
 export function LiveFeed({ connected, events }: { connected: boolean; events: RealtimeEvent[] }) {

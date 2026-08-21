@@ -1,7 +1,16 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { Card, ErrorBanner, Field, LiveFeed, StatusBadge, bloodGroup, formatDateTime } from '../components';
+import {
+  Card,
+  ErrorBanner,
+  Field,
+  LiveFeed,
+  StatusBadge,
+  bloodGroup,
+  formatDateTime,
+  shortId,
+} from '../components';
 import { useRealtime } from '../useRealtime';
 import type { BloodType, BloodUnit, Donation, InventoryRow, Match, Paginated, RhFactor } from '../types';
 
@@ -23,6 +32,7 @@ export function BloodBankDashboard() {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyMatchId, setBusyMatchId] = useState<string | null>(null);
 
   const [bloodType, setBloodType] = useState<BloodType>('O');
   const [rhFactor, setRhFactor] = useState<RhFactor>('negative');
@@ -88,21 +98,27 @@ export function BloodBankDashboard() {
 
   async function respond(matchId: string, action: 'accept' | 'reject') {
     setError(null);
+    setBusyMatchId(matchId);
     try {
       await api.post(`/matches/${matchId}/${action}`);
       await refresh();
     } catch (respondError) {
       setError(respondError instanceof Error ? respondError.message : 'Action failed');
+    } finally {
+      setBusyMatchId(null);
     }
   }
 
   async function moveMatch(matchId: string, status: 'transit' | 'delivered' | 'cancelled') {
     setError(null);
+    setBusyMatchId(matchId);
     try {
       await api.patch(`/matches/${matchId}/status`, { status });
       await refresh();
     } catch (moveError) {
       setError(moveError instanceof Error ? moveError.message : 'Action failed');
+    } finally {
+      setBusyMatchId(null);
     }
   }
 
@@ -191,6 +207,8 @@ export function BloodBankDashboard() {
           <thead>
             <tr>
               <th>Score</th>
+              <th>Request</th>
+              <th>Unit</th>
               <th>Hospital</th>
               <th>Group</th>
               <th>Needed by</th>
@@ -205,6 +223,8 @@ export function BloodBankDashboard() {
                 <td>
                   <strong>{match.score.toFixed(1)}</strong>
                 </td>
+                <td className="muted">{shortId(match.emergencyRequestId)}</td>
+                <td className="muted">{shortId(match.bloodUnitId)}</td>
                 <td>{match.hospital?.name ?? match.hospitalId}</td>
                 <td>
                   {match.bloodUnit ? bloodGroup(match.bloodUnit.bloodType, match.bloodUnit.rhFactor) : '—'}
@@ -218,21 +238,39 @@ export function BloodBankDashboard() {
                   <span className="row">
                     {match.status === 'proposed' && (
                       <>
-                        <button className="primary" type="button" onClick={() => respond(match.id, 'accept')}>
+                        <button
+                          className="primary"
+                          type="button"
+                          disabled={busyMatchId === match.id}
+                          onClick={() => respond(match.id, 'accept')}
+                        >
                           Accept
                         </button>
-                        <button type="button" onClick={() => respond(match.id, 'reject')}>
+                        <button
+                          type="button"
+                          disabled={busyMatchId === match.id}
+                          onClick={() => respond(match.id, 'reject')}
+                        >
                           Reject
                         </button>
                       </>
                     )}
                     {match.status === 'accepted' && (
-                      <button type="button" onClick={() => moveMatch(match.id, 'transit')}>
+                      <button
+                        type="button"
+                        disabled={busyMatchId === match.id}
+                        onClick={() => moveMatch(match.id, 'transit')}
+                      >
                         Mark in transit
                       </button>
                     )}
                     {match.status === 'transit' && (
-                      <button className="primary" type="button" onClick={() => moveMatch(match.id, 'delivered')}>
+                      <button
+                        className="primary"
+                        type="button"
+                        disabled={busyMatchId === match.id}
+                        onClick={() => moveMatch(match.id, 'delivered')}
+                      >
                         Mark delivered
                       </button>
                     )}
@@ -242,7 +280,7 @@ export function BloodBankDashboard() {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={7} className="muted">
+                <td colSpan={9} className="muted">
                   No match requests yet.
                 </td>
               </tr>

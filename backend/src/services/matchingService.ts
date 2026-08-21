@@ -118,10 +118,14 @@ export async function acceptMatch(matchId: string, performedBy: string): Promise
   if (match.status !== MatchStatus.proposed) throw badRequest(`Match is already ${match.status}`);
   if (match.bloodUnit.status !== BloodUnitStatus.available) throw badRequest('Blood unit is no longer available');
 
-  const updated = await prisma.match.update({
-    where: { id: matchId },
+  // Claim the proposal conditionally so two concurrent accepts cannot both win.
+  const claimed = await prisma.match.updateMany({
+    where: { id: matchId, status: MatchStatus.proposed },
     data: { status: MatchStatus.accepted, respondedAt: new Date() },
   });
+  if (claimed.count === 0) throw badRequest('Match is already accepted');
+
+  const updated = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
 
   await changeUnitStatus(match.bloodUnitId, BloodUnitStatus.reserved, performedBy, {
     emergencyRequestId: match.emergencyRequestId,
