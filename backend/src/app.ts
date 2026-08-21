@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Express } from 'express';
 import cors from 'cors';
 import { env } from './config/env';
@@ -29,6 +30,18 @@ export function createApp(): Express {
   app.use('/api/v1/matches', matchesRouter);
   app.use('/api/v1/donations', donationsRouter);
   app.use('/api/v1/analytics', analyticsRouter);
+
+  if (env.staticDir) {
+    const indexHtml = path.join(env.staticDir, 'index.html');
+    app.use(express.static(env.staticDir));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        next();
+        return;
+      }
+      res.sendFile(indexHtml);
+    });
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

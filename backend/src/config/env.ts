@@ -17,4 +17,6 @@ export const env = {
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: process.env.CORS_ORIGIN ?? '*',
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  // When set, the built frontend in this directory is served from the API origin.
+  staticDir: process.env.STATIC_DIR,
 };
