@@ -1,0 +1,413 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BloodType {
+  A
+  B
+  AB
+  O
+}
+
+enum RhFactor {
+  positive
+  negative
+}
+
+enum UserRole {
+  hospital_admin
+  blood_bank_admin
+  donor
+  system_admin
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum EligibilityStatus {
+  eligible
+  deferred
+  ineligible
+}
+
+enum DonationFrequency {
+  weekly
+  biweekly
+  monthly
+  quarterly
+}
+
+enum BloodUnitStatus {
+  available
+  reserved
+  transfused
+  expired
+  quarantined
+}
+
+enum TestingStatus {
+  pending
+  complete
+  failed
+}
+
+enum RequestPriority {
+  critical
+  urgent
+  routine
+}
+
+enum RequestStatus {
+  pending
+  matched
+  partial
+  fulfilled
+  cancelled
+}
+
+enum MatchStatus {
+  proposed
+  accepted
+  rejected
+  transit
+  delivered
+  cancelled
+}
+
+enum TransportMethod {
+  internal
+  external
+  hospital_pickup
+}
+
+enum DonationType {
+  whole_blood
+  platelets
+  plasma
+  red_blood_cells
+}
+
+enum DonationStatus {
+  scheduled
+  completed
+  deferred
+  cancelled
+}
+
+enum InventoryAction {
+  added
+  reserved
+  released
+  expired
+  transfused
+  quarantined
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  hospitalId   String?
+  bloodBankId  String?
+  donorId      String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  hospital  Hospital?  @relation(fields: [hospitalId], references: [id])
+  bloodBank BloodBank? @relation(fields: [bloodBankId], references: [id])
+  donor     Donor?     @relation(fields: [donorId], references: [id])
+
+  @@index([role])
+}
+
+model Hospital {
+  id            String @id @default(uuid())
+  name          String
+  licenseNumber String @unique
+
+  street  String
+  city    String
+  state   String
+  zipCode String
+  country String @default("India")
+
+  latitude  Float
+  longitude Float
+
+  phone            String
+  email            String
+  emergencyContact String
+
+  rating   Float   @default(4)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  emergencyRequests EmergencyRequest[]
+  matches           Match[]
+}
+
+model BloodBank {
+  id            String @id @default(uuid())
+  name          String
+  licenseNumber String @unique
+
+  street  String
+  city    String
+  state   String
+  zipCode String
+  country String @default("India")
+
+  latitude  Float
+  longitude Float
+
+  phone            String
+  email            String
+  emergencyContact String
+
+  totalCapacity      Int @default(500)
+  currentUtilization Int @default(0)
+
+  opensAt      String   @default("08:00")
+  closesAt     String   @default("20:00")
+  openDays     String[] @default(["mon", "tue", "wed", "thu", "fri", "sat"])
+  rating       Float    @default(4)
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  bloodUnits   BloodUnit[]
+  donations    Donation[]
+  matches      Match[]
+  inventoryLog InventoryLog[]
+  donors       Donor[]        @relation("PreferredBloodBank")
+}
+
+model Donor {
+  id          String    @id @default(uuid())
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime
+  gender      Gender
+  bloodType   BloodType
+  rhFactor    RhFactor
+
+  phone   String
+  email   String @unique
+  street  String
+  city    String
+  state   String
+  zipCode String
+
+  latitude  Float
+  longitude Float
+
+  weight            Float
+  lastDonationDate  DateTime?
+  totalDonations    Int               @default(0)
+  eligibilityStatus EligibilityStatus @default(eligible)
+  deferralReason    String?
+  eligibilityDate   DateTime?
+
+  preferredBloodBankId String?
+  notifyByEmail        Boolean           @default(true)
+  notifyBySms          Boolean           @default(false)
+  notifyByPush         Boolean           @default(false)
+  donationFrequency    DonationFrequency @default(quarterly)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  preferredBloodBank BloodBank?  @relation("PreferredBloodBank", fields: [preferredBloodBankId], references: [id])
+  users              User[]
+  bloodUnits         BloodUnit[]
+  donations          Donation[]
+
+  @@index([bloodType, rhFactor])
+}
+
+model BloodUnit {
+  id          String    @id @default(uuid())
+  bloodType   BloodType
+  rhFactor    RhFactor
+  bloodBankId String
+  donorId     String?
+
+  collectionDate DateTime
+  expiryDate     DateTime
+
+  status        BloodUnitStatus @default(available)
+  testingStatus TestingStatus   @default(pending)
+
+  testHiv         Boolean? 
+  testHepatitisB  Boolean?
+  testHepatitisC  Boolean?
+  testSyphilis    Boolean?
+  testNotes       String?
+
+  volume Float @default(450)
+
+  temperature            Float     @default(4)
+  lastTemperatureCheck   DateTime  @default(now())
+
+  emergencyRequestId String?
+  shelf              String  @default("A1")
+  refrigerator       String  @default("R1")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bloodBank        BloodBank         @relation(fields: [bloodBankId], references: [id])
+  donor            Donor?            @relation(fields: [donorId], references: [id])
+  emergencyRequest EmergencyRequest? @relation(fields: [emergencyRequestId], references: [id])
+  matches          Match[]
+  donation         Donation?
+  inventoryLog     InventoryLog[]
+
+  @@index([status, testingStatus])
+  @@index([bloodType, rhFactor])
+  @@index([bloodBankId])
+}
+
+model EmergencyRequest {
+  id         String @id @default(uuid())
+  hospitalId String
+
+  doctorName    String
+  department    String
+  contactNumber String
+
+  urgencyLevel Int
+  requiredBy   DateTime
+
+  patientAge       Int
+  patientGender    Gender
+  patientBloodType BloodType
+  patientRhFactor  RhFactor
+  diagnosis        String?
+
+  status RequestStatus @default(pending)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hospital     Hospital           @relation(fields: [hospitalId], references: [id])
+  requirements BloodRequirement[]
+  matches      Match[]
+  reservedUnits BloodUnit[]
+
+  @@index([status])
+}
+
+model BloodRequirement {
+  id                 String @id @default(uuid())
+  emergencyRequestId String
+
+  bloodType BloodType
+  rhFactor  RhFactor
+  quantity  Int
+  priority  RequestPriority @default(urgent)
+
+  emergencyRequest EmergencyRequest @relation(fields: [emergencyRequestId], references: [id], onDelete: Cascade)
+}
+
+model Match {
+  id                 String @id @default(uuid())
+  emergencyRequestId String
+  bloodUnitId        String
+  bloodBankId        String
+  hospitalId         String
+
+  score              Float
+  compatibilityScore Float
+  distanceScore      Float
+  urgencyScore       Float
+  expiryScore        Float
+  bloodBankRating    Float
+
+  status MatchStatus @default(proposed)
+
+  transportMethod TransportMethod @default(hospital_pickup)
+  estimatedTime   Int
+  actualTime      Int?
+  trackingId      String?
+
+  proposedAt  DateTime  @default(now())
+  respondedAt DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emergencyRequest EmergencyRequest @relation(fields: [emergencyRequestId], references: [id], onDelete: Cascade)
+  bloodUnit        BloodUnit        @relation(fields: [bloodUnitId], references: [id])
+  bloodBank        BloodBank        @relation(fields: [bloodBankId], references: [id])
+  hospital         Hospital         @relation(fields: [hospitalId], references: [id])
+
+  @@unique([emergencyRequestId, bloodUnitId])
+  @@index([status])
+}
+
+model Donation {
+  id          String   @id @default(uuid())
+  donorId     String
+  bloodBankId String
+  bloodUnitId String?  @unique
+
+  donationDate DateTime
+  donationType DonationType @default(whole_blood)
+  volume       Float        @default(450)
+
+  hemoglobin        Float
+  systolic          Int
+  diastolic         Int
+  temperature       Float
+  weight            Float
+  questionsPassed   Boolean @default(true)
+
+  status DonationStatus @default(scheduled)
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donor     Donor      @relation(fields: [donorId], references: [id])
+  bloodBank BloodBank  @relation(fields: [bloodBankId], references: [id])
+  bloodUnit BloodUnit? @relation(fields: [bloodUnitId], references: [id])
+}
+
+model InventoryLog {
+  id          String @id @default(uuid())
+  bloodBankId String
+  bloodUnitId String
+
+  action         InventoryAction
+  quantity       Int             @default(1)
+  previousStatus String?
+  newStatus      String?
+  performedBy    String
+  notes          String?
+
+  timestamp DateTime @default(now())
+
+  bloodBank BloodBank @relation(fields: [bloodBankId], references: [id])
+  bloodUnit BloodUnit @relation(fields: [bloodUnitId], references: [id])
+
+  @@index([bloodBankId, timestamp])
+}
