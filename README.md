@@ -30,6 +30,35 @@ npm run dev                   # http://localhost:5173
 
 The Vite dev server proxies `/api` and `/socket.io` to the backend, so open http://localhost:5173.
 
+## Docker deployment
+
+```bash
+cp .env.example .env          # Windows: copy .env.example .env
+docker compose up -d --build
+```
+
+| Service    | URL                     |
+| ---------- | ----------------------- |
+| Frontend   | http://localhost        |
+| Backend    | http://localhost:4000   |
+| PostgreSQL | localhost:5432          |
+
+The frontend container serves the built React app through nginx and proxies `/api` and
+`/socket.io` to the backend container, so the browser only ever talks to port 80. The backend
+container applies Prisma migrations on start and seeds the demo data when the database has no
+users (`SEED_ON_START=true`); seeding is skipped on every later start so real data is never wiped.
+
+Set a strong `JWT_SECRET` in `.env` before exposing the stack (`openssl rand -hex 32`). If port 80
+is taken, set `FRONTEND_PORT` and update `CORS_ORIGIN` to match.
+
+Useful commands:
+
+```bash
+docker compose logs -f backend      # startup, migrations and seeding
+docker compose down                 # stop (keeps the database volume)
+docker compose down -v              # stop and delete the database
+```
+
 ### Demo accounts
 
 All seeded accounts use the password `Password123!`.
