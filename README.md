@@ -59,6 +59,23 @@ docker compose down                 # stop (keeps the database volume)
 docker compose down -v              # stop and delete the database
 ```
 
+## Deploy to Render (public URL)
+
+`render.yaml` describes a free Postgres database plus one Docker web service that serves the API
+and the built frontend from the same origin (root [`Dockerfile`](Dockerfile)).
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, pick the repo, apply. `JWT_SECRET` is generated and
+   `DATABASE_URL` is wired to the database automatically.
+3. Wait for the first deploy; migrations run and the demo data is seeded because the database is
+   empty. The app is then live at `https://<service-name>.onrender.com`.
+
+Notes:
+
+- Free web services sleep after ~15 minutes idle, so the first request afterwards takes ~1 minute.
+- Free Postgres instances expire after 30 days; upgrade the plan for anything long lived.
+- Set `SEED_ON_START=false` in the Render dashboard once you have real data.
+
 ### Demo accounts
 
 All seeded accounts use the password `Password123!`.
